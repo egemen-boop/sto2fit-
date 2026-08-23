@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StO2 Fit - Mobil Sağlık Paneli</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e2f">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/nolan/192/pulse.png">
+    
+    <!-- Third Party Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #12121c;
+            color: #ffffff;
+            padding-bottom: 70px; /* Space for bottom navigation */
+            min-height: 100vh;
+            transition: background-color 0.8s ease;
+        }
+
+        @keyframes warningPulse {
+            0% { background-color: #12121c; }
+            50% { background-color: #4a0808; }
+            100% { background-color: #12121c; }
+        }
+
+        body.warning-active {
+            animation: warningPulse 2.5s infinite ease-in-out;
+        }
+
+        /* Top Header */
+        header {
+            background: linear-gradient(135deg, #1e1e2f, #151522);
+            padding: 18px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00f2fe, #4CAF50);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #f44336; /* Red (Disconnected) by default */
+            box-shadow: 0 0 8px #f44336;
+            transition: all 0.3s ease;
+        }
+
+        header .status-indicator.connected {
+            background-color: #4CAF50;
+            box-shadow: 0 0 8px #4CAF50;
+        }
+
+        /* Container & Grid Layout */
+        .container {
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Sections (Tabs) */
+        .app-section {
+            display: none;
+        }
+
+        .app-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Material / Glass Cards */
+        .card {
+            background: #1e1e2f;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #8888a0;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Circular Ring for StO2 (Google Fit style) */
+        .fit-ring-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .fit-ring {
+            width: 160px;
+            height: 160px;
+            transform: rotate(-90deg);
+        }
+
+        .fit-ring circle {
+            fill: none;
+            stroke-width: 14;
+        }
+
+        .fit-ring-bg {
+            stroke: rgba(255, 255, 255, 0.06);
+        }
+
+        .fit-ring-progress {
+            stroke: #4CAF50;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.8s ease;
+        }
+
+        .fit-ring-text {
+            position: absolute;
+            text-align: center;
+        }
+
+        .fit-ring-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .fit-ring-label {
+            font-size: 12px;
+            color: #8888a0;
+            margin-top: 2px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 700;
+            color: #00f2fe;
+            margin-bottom: 4px;
+        }
+
+        .stat-lbl {
+            font-size: 11px;
+            color: #8888a0;
+        }
+
+        /* Buttons & Forms */
+        .btn {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary { background: linear-gradient(90deg, #00f2fe, #4CAF50); color: #12121c; }
+        .btn-secondary { background: #2d2d44; color: #ffffff; }
+        .btn-danger { background: #f44336; color: #ffffff; }
+        .btn-warning { background: #ff9800; color: #ffffff; }
+
+        /* Bottom Navigation Bar */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background-color: #1e1e2f;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #8888a0;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            width: 100%;
+            height: 100%;
+            transition: color 0.2s ease;
+        }
+
+        .nav-item i {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .nav-item.active {
+            color: #00f2fe;
+        }
+
+        /* Progress Bar (Calibration & Step Progress) */
+        .progress-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            height: 16px;
+            position: relative;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00f2fe, #4CAF50);
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            line-height: 16px;
+            color: #fff;
+            top: 0;
+            left: 0;
+        }
+
+        /* Display Panel for Data Values */
+        .value-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .value-row:last-child {
+            border: none;
+        }
+
+        .value-lbl {
+            font-size: 14px;
+            color: #8888a0;
+        }
+
+        .value-val {
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        /* History List styling */
+        .history-list {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-date {
+            font-size: 11px;
+            color: #8888a0;
+        }
+
+        .history-sto2 {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+
+        .history-delete {
+            color: #f44336;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* Sub-controls Grid for control section */
+        .sub-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header bar -->
+    <header>
+        <h1>StO2 Fit</h1>
+        <div id="statusInd" class="status-indicator"></div>
+    </header>
+
+    <div class="container">
+
+        <!-- 1. TABS: 🏠 DASHBOARD / ÖZET -->
+        <div id="sectionSummary" class="app-section active">
+            <div class="card" style="text-align: center;">
+                <div class="card-title" style="justify-content: center;">
+                    <i class="fas fa-heartbeat"></i> Son Ölçülen Doku Oksijeni
+                </div>
+                <div class="fit-ring-container">
+                    <svg class="fit-ring">
+                        <circle class="fit-ring-bg" cx="80" cy="80" r="70"></circle>
+                        <circle id="dashRingProgress" class="fit-ring-progress" cx="80" cy="80" r="70" stroke-dasharray="440" stroke-dashoffset="440"></circle>
+                    </svg>
+                    <div class="fit-ring-text">
+                        <div id="dashStO2" class="fit-ring-value">-- %</div>
+                        <div class="fit-ring-label">Güncel Değer</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="fas fa-chart-line"></i> Bugünün Özet Verileri</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div id="statTotalMeas" class="stat-val">0</div>
+                        <div class="stat-lbl">Toplam Ölçüm</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="statAvgStO2" class="stat-val">-- %</div>
+                        <div class="stat-lbl">Ortalama StO2</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="statMinStO2" class="stat-val">-- %</div>
+                        <div class="stat-lbl">En Düşük StO2</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="statLatestBpm" class="stat-val">--</div>
+                        <div class="stat-lbl">Son Nabız (BPM)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- StO2 Geçmiş Grafiği -->
+            <div class="card" id="sto2ChartCard" style="display: none;">
+                <div class="card-title"><i class="fas fa-chart-area"></i> StO2 Geçmiş Grafiği</div>
+                <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; height: 180px; position: relative;">
+                    <canvas id="sto2HistoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. TABS: 📶 CİHAZ VE KONTROL (MANUEL, KALİBRASYON, ÖLÇÜM, PPG) -->
+        <div id="sectionControl" class="app-section">
+            <div class="card">
+                <div class="card-title"><i class="fas fa-link"></i> Cihaz Bağlantısı</div>
+                <button id="connectBleBtn" class="btn btn-primary"><i class="fas fa-bluetooth"></i> Bluetooth ile Bağlan</button>
+                <button id="connectBtn" class="btn btn-secondary"><i class="fas fa-usb"></i> USB Kablosu ile Bağlan</button>
+            </div>
+
+            <!-- Mode selector switches -->
+            <div class="card">
+                <div class="card-title"><i class="fas fa-sliders-h"></i> Çalışma Modları</div>
+                <div class="sub-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                    <button id="manualBtn" class="btn btn-secondary" style="font-size: 11px; padding: 8px 4px;">Manuel</button>
+                    <button id="calibBtn" class="btn btn-secondary" style="font-size: 11px; padding: 8px 4px;">Kalib</button>
+                    <button id="measureBtn" class="btn btn-secondary" style="font-size: 11px; padding: 8px 4px;">Ölçüm</button>
+                    <button id="ppgBtn" class="btn btn-warning" style="font-size: 11px; padding: 8px 4px; background: #e91e63;">PPG</button>
+                </div>
+            </div>
+
+            <!-- Panel: Manuel Mod -->
+            <div id="panelManual" class="card" style="display: none;">
+                <div class="card-title" style="color: #4CAF50;"><i class="fas fa-tools"></i> Manuel Kontrol</div>
+                <div class="value-row">
+                    <span class="value-lbl">Aktif LED:</span>
+                    <span id="manLed" class="value-val" style="color: #ff4b2b;">Kırmızı (660nm)</span>
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Okunan ADC Değeri:</span>
+                    <span id="manAdc" class="value-val" style="font-size: 20px; color: #00f2fe;">----</span>
+                </div>
+                <button id="toggleBtn" class="btn btn-secondary" style="margin-top: 12px;"><i class="fas fa-exchange-alt"></i> LED Değiştir</button>
+            </div>
+
+            <!-- Panel: Kalibrasyon -->
+            <div id="panelCalib" class="card" style="display: none;">
+                <div class="card-title" style="color: #f44336;"><i class="fas fa-crosshairs"></i> Otomatik Kalibrasyon</div>
+                <div class="value-row">
+                    <span class="value-lbl">Hedef LED:</span>
+                    <span id="calibLed" class="value-val">Kırmızı (660nm)</span>
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Adım:</span>
+                    <span id="calibStep" class="value-val" style="color: #ff9800;">-- / 120</span>
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Hedef ADC / Canlı DAC:</span>
+                    <span class="value-val"><span id="calibAdc">----</span> / <span id="calibDac" style="color: #00f2fe;">----</span></span>
+                </div>
+                <div class="progress-container">
+                    <div id="calibProgressBar" class="progress-bar"></div>
+                    <div id="calibProgressText" class="progress-text">0%</div>
+                </div>
+                <button id="abortBtn" class="btn btn-danger" style="margin-top: 15px;"><i class="fas fa-stop"></i> İptal Et</button>
+            </div>
+
+            <!-- Panel: Ölçüm -->
+            <div id="panelMeasure" class="card" style="display: none;">
+                <div class="card-title" style="color: #00f2fe;"><i class="fas fa-stethoscope"></i> StO2 Ölçüm Paneli</div>
+                <div class="sub-grid" style="margin-bottom: 14px;">
+                    <button id="measSingleBtn" class="btn btn-secondary" style="font-size: 12px;"><i class="fas fa-play"></i> 1 Ölçüm</button>
+                    <button id="measTenBtn" class="btn btn-primary" style="font-size: 12px;"><i class="fas fa-redo"></i> 10 Ölçüm (Ort.)</button>
+                </div>
+                <div id="measGroupProgress" style="display: none; font-size: 12px; color: #ff9800; text-align: center; margin-bottom: 8px;">
+                    İlerleme: 0 / 10
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Adım:</span>
+                    <span class="value-val"><span id="measStep">-- / 10</span> <i id="measSpinner" class="fas fa-circle-notch fa-spin" style="display:none; color:#4CAF50;"></i></span>
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Kırmızı / IR Net ADC:</span>
+                    <span class="value-val"><span id="measRed" style="color: #ff4b2b;">--</span> / <span id="measIr" style="color: #a64dff;">--</span></span>
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Arka Plan (Bg):</span>
+                    <span id="measBg" class="value-val">--</span>
+                </div>
+                <div class="value-row">
+                    <span class="value-lbl">Hesaplanan Oran (A):</span>
+                    <span id="measRatio" class="value-val">--</span>
+                </div>
+                <div class="value-row" style="background: rgba(76, 175, 80, 0.1); border-radius: 8px; padding: 12px; margin-top: 8px;">
+                    <span class="value-lbl" style="color: #a5d6a7;">Doku Oksijeni (StO2):</span>
+                    <span id="measStO2" class="value-val" style="font-size: 24px; color: #ffeb3b;">-- %</span>
+                </div>
+                <div class="progress-container">
+                    <div id="measProgressBar" class="progress-bar"></div>
+                    <div id="measProgressText" class="progress-text">0%</div>
+                </div>
+            </div>
+
+            <!-- Panel: PPG Canlı Dalga -->
+            <div id="panelPPG" class="card" style="display: none;">
+                <div class="card-title" style="color: #e91e63;"><i class="fas fa-heartbeat"></i> Canlı PPG Grafik</div>
+                <div style="background: rgba(0,0,0,0.6); padding: 8px; border-radius: 8px; margin-bottom: 12px;">
+                    <canvas id="ppgChart" width="400" height="150"></canvas>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item" style="padding: 8px;">
+                        <div id="bpmValue" class="stat-val" style="color:#4CAF50; font-size:24px;">--</div>
+                        <div class="stat-lbl">Nabız (BPM)</div>
+                    </div>
+                    <div class="stat-item" style="padding: 8px;">
+                        <div id="spo2Value" class="stat-val" style="color:#2196F3; font-size:24px;">-- %</div>
+                        <div class="stat-lbl">SpO2 Tahmini</div>
+                    </div>
+                </div>
+                <div class="sub-grid" style="margin-top: 12px;">
+                    <button id="restartPpgBtn" class="btn btn-secondary" style="font-size: 12px;"><i class="fas fa-sync"></i> Yeniden Başlat</button>
+                    <button id="stopMeasBtn" class="btn btn-danger" style="font-size: 12px;"><i class="fas fa-stop"></i> Durdur</button>
+                </div>
+            </div>
+
+            <!-- Terminal output card -->
+            <div class="card">
+                <div class="card-title" style="justify-content: space-between;">
+                    <span>Sistem Mesajları</span>
+                    <button id="clearTermBtn" class="btn" style="margin: 0; padding: 4px 8px; width: auto; font-size: 10px; background: rgba(255,0,0,0.2);">Temizle</button>
+                </div>
+                <textarea id="terminalOut" readonly style="width: 100%; height: 90px; background: rgba(0,0,0,0.5); color: #00f2fe; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 8px; font-family: monospace; resize: none; font-size: 11px; outline: none;"></textarea>
+            </div>
+        </div>
+
+        <!-- 3. TABS: 📜 GEÇMİŞ / UYGULAMA VERİTABANI -->
+        <div id="sectionHistory" class="app-section">
+            <div class="card">
+                <div class="card-title" style="justify-content: space-between;">
+                    <span>Ölçüm Geçmişi (Google Fit)</span>
+                    <button id="clearHistoryBtn" class="btn btn-danger" style="margin: 0; padding: 4px 8px; width: auto; font-size: 10px;"><i class="fas fa-trash"></i> Hepsini Temizle</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <!-- History items will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="nav-bar">
+        <a href="#" id="navSummary" class="nav-item active"><i class="fas fa-home"></i>Özet</a>
+        <a href="#" id="navControl" class="nav-item"><i class="fas fa-sliders-h"></i>Kontrol</a>
+        <a href="#" id="navHistory" class="nav-item"><i class="fas fa-history"></i>Geçmiş</a>
+    </div>
+
+    <script>
+        // Core Connection Variables
+        let port;
+        let writer;
+        let reader;
+        let keepReading = true;
+
+        let bleDevice = null;
+        let bleRxCharacteristic = null;
+        let bleTxCharacteristic = null;
+        let isBleConnected = false;
+
+        const BLE_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+        const BLE_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+        const BLE_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+        // Navigation elements
+        const navSummary = document.getElementById('navSummary');
+        const navControl = document.getElementById('navControl');
+        const navHistory = document.getElementById('navHistory');
+
+        const sectionSummary = document.getElementById('sectionSummary');
+        const sectionControl = document.getElementById('sectionControl');
+        const sectionHistory = document.getElementById('sectionHistory');
+
+        // Layout panels
+        const panelManual = document.getElementById('panelManual');
+        const panelCalib = document.getElementById('panelCalib');
+        const panelMeasure = document.getElementById('panelMeasure');
+        const panelPPG = document.getElementById('panelPPG');
+
+        // Buttons
+        const connectBtn = document.getElementById('connectBtn');
+        const connectBleBtn = document.getElementById('connectBleBtn');
+        const manualBtn = document.getElementById('manualBtn');
+        const calibBtn = document.getElementById('calibBtn');
+        const measureBtn = document.getElementById('measureBtn');
+        const ppgBtn = document.getElementById('ppgBtn');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const abortBtn = document.getElementById('abortBtn');
+        const stopMeasBtn = document.getElementById('stopMeasBtn');
+        const restartPpgBtn = document.getElementById('restartPpgBtn');
+        const clearTermBtn = document.getElementById('clearTermBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+        // Telemetry details UI
+        const manLed = document.getElementById('manLed');
+        const manAdc = document.getElementById('manAdc');
+        const calibLed = document.getElementById('calibLed');
+        const calibAdc = document.getElementById('calibAdc');
+        const calibDac = document.getElementById('calibDac');
+        const calibProgressBar = document.getElementById('calibProgressBar');
+        const calibProgressText = document.getElementById('calibProgressText');
+
+        // Measurement sub-states
+        let measureSubMode = 'idle';
+        let tenMeasCount = 0;
+        let tenMeasRatios = [];
+        let tenMeasStO2s = [];
+
+        // Tab Navigation click handlers
+        function switchTab(activeNav, activeSec) {
+            [navSummary, navControl, navHistory].forEach(n => n.classList.remove('active'));
+            [sectionSummary, sectionControl, sectionHistory].forEach(s => s.classList.remove('active'));
+            activeNav.classList.add('active');
+            activeSec.classList.add('active');
+            
+            if (activeSec === sectionSummary) {
+                updateDashboardSummary();
+            } else if (activeSec === sectionHistory) {
+                renderHistory();
+            }
+        }
+
+        navSummary.addEventListener('click', (e) => { e.preventDefault(); switchTab(navSummary, sectionSummary); });
+        navControl.addEventListener('click', (e) => { e.preventDefault(); switchTab(navControl, sectionControl); });
+        navHistory.addEventListener('click', (e) => { e.preventDefault(); switchTab(navHistory, sectionHistory); });
+
+        // USB Serial Connection
+        connectBtn.addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+                
+                updateConnectionStatus(true);
+                logToTerminal("USB Bağlantısı Başarılı!");
+                
+                const textEncoder = new TextEncoderStream();
+                textEncoder.readable.pipeTo(port.writable);
+                writer = textEncoder.writable.getWriter();
+                
+                keepReading = true;
+                readLoop();
+            } catch (err) {
+                console.error("USB Serial error:", err);
+                logToTerminal(`USB Bağlantı Hatası: ${err.message}`);
+            }
+        });
+
+        // Web Bluetooth BLE Connection
+        connectBleBtn.addEventListener('click', async () => {
+            if (isBleConnected) {
+                if (bleDevice) await bleDevice.gatt.disconnect();
+                return;
+            }
+
+            try {
+                logToTerminal("Bluetooth cihazları taranıyor...");
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: "ESP32_OPTIC_CALIB" }],
+                    optionalServices: [BLE_SERVICE_UUID]
+                });
+
+                logToTerminal(`Bağlanılıyor: ${bleDevice.name}...`);
+                bleDevice.addEventListener('gattserverdisconnected', onBleDisconnected);
+
+                const server = await bleDevice.gatt.connect();
+                const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+
+                bleRxCharacteristic = await service.getCharacteristic(BLE_RX_UUID);
+                bleTxCharacteristic = await service.getCharacteristic(BLE_TX_UUID);
+
+                await bleTxCharacteristic.startNotifications();
+                bleTxCharacteristic.addEventListener('characteristicvaluechanged', handleBleNotification);
+
+                updateConnectionStatus(true);
+                connectBleBtn.textContent = '📶 Bağlantıyı Kes';
+                connectBleBtn.style.background = '#f44336';
+                isBleConnected = true;
+                logToTerminal("Bluetooth Bağlantısı Başarılı!");
+            } catch (error) {
+                logToTerminal(`Bluetooth Bağlantı Hatası: ${error.message}`);
+                console.error(error);
+            }
+        });
+
+        function onBleDisconnected() {
+            updateConnectionStatus(false);
+            connectBleBtn.textContent = '📶 Bluetooth ile Bağlan';
+            connectBleBtn.style.background = '#2196F3';
+            isBleConnected = false;
+            bleDevice = null;
+            bleRxCharacteristic = null;
+            bleTxCharacteristic = null;
+            logToTerminal("Bluetooth bağlantısı kesildi.");
+        }
+
+        function updateConnectionStatus(isConnected) {
+            const ind = document.getElementById('statusInd');
+            if (isConnected) {
+                ind.classList.add('connected');
+            } else {
+                ind.classList.remove('connected');
+            }
+        }
+
+        // NUS BLE notifications parser
+        let bleBuffer = "";
+        function handleBleNotification(event) {
+            let val = event.target.value;
+            let enc = new TextDecoder("utf-8");
+            let text = enc.decode(val);
+            
+            bleBuffer += text;
+            let lines = bleBuffer.split("\n");
+            bleBuffer = lines.pop();
+
+            for (let line of lines) {
+                line = line.trim();
+                if (line) {
+                    processTelemetry(line);
+                }
+            }
+        }
+
+        // Send character commands via BLE or USB
+        async function sendCommand(cmd) {
+            if (isBleConnected && bleRxCharacteristic) {
+                try {
+                    let enc = new TextEncoder();
+                    await bleRxCharacteristic.writeValue(enc.encode(cmd));
+                } catch (err) {
+                    console.error("BLE Send Error:", err);
+                    logToTerminal(`Bluetooth Gönderim Hatası: ${err.message}`);
+                }
+            } else if (writer) {
+                await writer.write(cmd);
+            } else {
+                alert("Önce Cihaza Bağlanın (USB veya Bluetooth)!");
+            }
+        }
+
+        // USB Serial Reader loop
+        async function readLoop() {
+            const decoder = new TextDecoderStream();
+            port.readable.pipeTo(decoder.writable);
+            const inputStream = decoder.readable;
+            reader = inputStream.getReader();
+            let buffer = '';
+
+            try {
+                while (keepReading) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) {
+                        buffer += value;
+                        let lines = buffer.split('\n');
+                        buffer = lines.pop();
+                        
+                        for (let line of lines) {
+                            processTelemetry(line.trim());
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("USB Okuma hatası:", error);
+            } finally {
+                reader.releaseLock();
+            }
+        }
+
+        // Terminal message logger
+        function logToTerminal(msg) {
+            const term = document.getElementById('terminalOut');
+            if (term) {
+                term.value += msg + "\n";
+                term.scrollTop = term.scrollHeight;
+            }
+        }
+
+        // Clean up UI panel visibility based on active sub-modes
+        function activatePanel(targetPanel) {
+            [panelManual, panelCalib, panelMeasure, panelPPG].forEach(p => {
+                p.style.display = (p === targetPanel) ? 'block' : 'none';
+            });
+        }
+
+        // Work mode buttons
+        manualBtn.addEventListener('click', () => { activatePanel(panelManual); sendCommand('M'); });
+        calibBtn.addEventListener('click', () => {
+            if (confirm("Kalibrasyon işlemini başlatmak istediğinize emin misiniz?")) {
+                activatePanel(panelCalib);
+                sendCommand('C');
+            }
+        });
+        measureBtn.addEventListener('click', () => {
+            activatePanel(panelMeasure);
+            resetMeasureUI();
+            stopAnySubMode();
+            sendCommand('E');
+        });
+        ppgBtn.addEventListener('click', () => {
+            activatePanel(panelPPG);
+            document.getElementById('bpmValue').textContent = '--';
+            document.getElementById('spo2Value').textContent = '-- %';
+            ppgChart.data.datasets[0].data = Array(100).fill(0);
+            ppgChart.data.datasets[1].data = Array(100).fill(0);
+            ppgChart.update();
+            sendCommand('P');
+        });
+
+        // Toggle LED & Abort
+        toggleBtn.addEventListener('click', () => sendCommand('T'));
+        abortBtn.addEventListener('click', () => sendCommand('A'));
+        stopMeasBtn.addEventListener('click', () => sendCommand('A'));
+        clearTermBtn.addEventListener('click', () => { terminalOut.value = ''; });
+
+        // Measure panels UI reset & single/ten steps triggers
+        function resetMeasureUI() {
+            document.getElementById('measStep').textContent = "-- / 10";
+            document.getElementById('measBg').textContent = "--";
+            document.getElementById('measRed').textContent = "--";
+            document.getElementById('measIr').textContent = "--";
+            document.getElementById('measRatio').textContent = "--";
+            document.getElementById('measStO2').textContent = "-- %";
+            document.getElementById('measProgressBar').style.width = "0%";
+            document.getElementById('measProgressText').textContent = "0%";
+            document.getElementById('measGroupProgress').style.display = 'none';
+        }
+
+        function stopAnySubMode() {
+            measureSubMode = 'idle';
+            document.getElementById('measGroupProgress').style.display = 'none';
+        }
+
+        const measSingleBtn = document.getElementById('measSingleBtn');
+        const measTenBtn = document.getElementById('measTenBtn');
+
+        measSingleBtn.addEventListener('click', () => {
+            stopAnySubMode();
+            resetMeasureUI();
+            measureSubMode = 'single';
+            sendCommand('O');
+        });
+
+        measTenBtn.addEventListener('click', () => {
+            stopAnySubMode();
+            resetMeasureUI();
+            measureSubMode = 'ten';
+            tenMeasCount = 0;
+            tenMeasRatios = [];
+            tenMeasStO2s = [];
+            
+            const groupProg = document.getElementById('measGroupProgress');
+            groupProg.style.display = 'block';
+            groupProg.textContent = "Grup İlerlemesi: 0 / 10";
+            sendCommand('O');
+        });
+
+        // ChartJS instance for Live PPG Graph
+        const ctx = document.getElementById('ppgChart').getContext('2d');
+        const ppgChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(100).fill(''),
+                datasets: [
+                    {
+                        label: 'IR Sinyal',
+                        borderColor: '#a64dff',
+                        backgroundColor: 'rgba(166, 77, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        data: Array(100).fill(0)
+                    },
+                    {
+                        label: 'Kırmızı Sinyal',
+                        borderColor: '#ff4b2b',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        data: Array(100).fill(0),
+                        hidden: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        let signalHistoryIR = [];
+        let signalHistoryRed = [];
+        let timeHistory = [];
+        const HISTORY_SIZE = 100;
+        let lastPeakTime = 0;
+
+        function detectPeakAndCalculateBpm(irValue, redValue, smoothIr, smoothRed) {
+            let now = Date.now();
+            signalHistoryIR.push(irValue);
+            signalHistoryRed.push(redValue);
+            timeHistory.push(now);
+            
+            if (signalHistoryIR.length > HISTORY_SIZE) {
+                signalHistoryIR.shift();
+                signalHistoryRed.shift();
+                timeHistory.shift();
+            }
+            
+            if (signalHistoryIR.length > 20) {
+                let window = signalHistoryIR.slice(-20);
+                let max = Math.max(...window);
+                let min = Math.min(...window);
+                
+                if (irValue === max && (max - min) > 10 && (now - lastPeakTime) > 400) {
+                    if (lastPeakTime !== 0) {
+                        let rrInterval = now - lastPeakTime;
+                        let bpm = Math.round(60000 / rrInterval);
+                        if (bpm > 40 && bpm < 200) {
+                            document.getElementById('bpmValue').textContent = bpm;
+                            document.getElementById('statLatestBpm').textContent = bpm;
+                        }
+                    }
+                    lastPeakTime = now;
+                }
+            }
+            
+            if (signalHistoryIR.length > 50) {
+                let irAC = Math.max(...signalHistoryIR) - Math.min(...signalHistoryIR);
+                let redAC = Math.max(...signalHistoryRed) - Math.min(...signalHistoryRed);
+                let irDC = smoothIr;
+                let redDC = smoothRed;
+                
+                if (irAC > 0 && irDC > 0 && redDC > 0) {
+                    let R = (redAC / redDC) / (irAC / irDC);
+                    let spo2 = 110 - (25 * R);
+                    if (spo2 > 100) spo2 = 100;
+                    if (spo2 < 0) spo2 = 0;
+                    
+                    if (irAC > 10) {
+                        document.getElementById('spo2Value').textContent = Math.round(spo2) + " %";
+                    }
+                }
+            }
+        }
+
+        // Live PPG Graph update
+        let irFilterBuf = [];
+        let redFilterBuf = [];
+        const FILTER_WINDOW = 5;
+        let prevIrIn = 0, prevIrOut = 0;
+        let prevRedIn = 0, prevRedOut = 0;
+        const DC_BLOCKER_R = 0.95;
+
+        function updateChart(red, ir) {
+            irFilterBuf.push(ir);
+            redFilterBuf.push(red);
+            if (irFilterBuf.length > FILTER_WINDOW) irFilterBuf.shift();
+            if (redFilterBuf.length > FILTER_WINDOW) redFilterBuf.shift();
+            
+            let smoothIr = irFilterBuf.reduce((a,b) => a+b, 0) / irFilterBuf.length;
+            let smoothRed = redFilterBuf.reduce((a,b) => a+b, 0) / redFilterBuf.length;
+            
+            if (prevIrIn === 0) { prevIrIn = smoothIr; prevRedIn = smoothRed; }
+            
+            let outIr = smoothIr - prevIrIn + DC_BLOCKER_R * prevIrOut;
+            prevIrIn = smoothIr;
+            prevIrOut = outIr;
+            
+            let outRed = smoothRed - prevRedIn + DC_BLOCKER_R * prevRedOut;
+            prevRedIn = smoothRed;
+            prevRedOut = outRed;
+            
+            let dataIR = ppgChart.data.datasets[0].data;
+            let dataRed = ppgChart.data.datasets[1].data;
+            
+            dataIR.push(outIr);
+            dataRed.push(outRed);
+            
+            if (dataIR.length > HISTORY_SIZE) {
+                dataIR.shift();
+                dataRed.shift();
+            }
+            
+            let validDataIR = dataIR.filter(v => Math.abs(v) > 0.001);
+            if (validDataIR.length > 0) {
+                let maxIR = Math.max(...validDataIR);
+                let minIR = Math.min(...validDataIR);
+                if(maxIR > minIR) {
+                    ppgChart.options.scales.y.max = maxIR + (maxIR-minIR)*0.2;
+                    ppgChart.options.scales.y.min = minIR - (maxIR-minIR)*0.2;
+                }
+            }
+            
+            ppgChart.update();
+            detectPeakAndCalculateBpm(outIr, outRed, smoothIr, smoothRed);
+        }
+
+        // TELEMETRY INTERPRETER / PARSER
+        function processTelemetry(line) {
+            if (!line.startsWith('{') || !line.endsWith('}')) {
+                if (line.trim().length > 0) {
+                    logToTerminal(line);
+                }
+                return;
+            }
+
+            try {
+                const data = JSON.parse(line);
+                
+                // Hardware button synchronized layout switches
+                if (data.mode === 'ready') {
+                    // Back to ready
+                } else if (data.mode === 'manual' && !panelManual.style.display !== 'none') {
+                    activatePanel(panelManual);
+                    switchTab(navControl, sectionControl);
+                } else if (data.mode === 'calibrate_ready' && !panelCalib.style.display !== 'none') {
+                    activatePanel(panelCalib);
+                    switchTab(navControl, sectionControl);
+                } else if (data.mode === 'measure_ready' && !panelMeasure.style.display !== 'none') {
+                    activatePanel(panelMeasure);
+                    resetMeasureUI();
+                    switchTab(navControl, sectionControl);
+                } else if (data.mode === 'continuous' && !panelPPG.style.display !== 'none') {
+                    activatePanel(panelPPG);
+                    switchTab(navControl, sectionControl);
+                }
+
+                // Data values updates
+                if (data.mode === 'manual') {
+                    manAdc.textContent = data.adc;
+                    if (data.led === 1) {
+                        manLed.textContent = "Kırmızı (660nm)";
+                        manLed.style.color = "#ff4b2b";
+                    } else {
+                        manLed.textContent = "Kızılötesi (940nm)";
+                        manLed.style.color = "#a64dff";
+                    }
+                } 
+                else if (data.mode === 'calibrate') {
+                    calibAdc.textContent = data.adc;
+                    if (data.dac !== undefined) calibDac.textContent = data.dac;
+                    
+                    let currentStep = data.step;
+                    let isRed = (data.led === 'red');
+                    
+                    if (isRed) {
+                        calibLed.textContent = "Kırmızı (660nm)";
+                        calibLed.style.color = "#ff4b2b";
+                    } else {
+                        calibLed.textContent = "Kızılötesi (940nm)";
+                        calibLed.style.color = "#a64dff";
+                        currentStep += 60;
+                    }
+                    
+                    document.getElementById('calibStep').textContent = currentStep + " / 120";
+                    let percent = Math.round((currentStep / 120) * 100);
+                    calibProgressBar.style.width = percent + "%";
+                    calibProgressText.textContent = percent + "% (" + currentStep + " / 120)";
+                }
+                else if (data.mode === 'measure') {
+                    document.getElementById('measStep').textContent = data.step + " / 10";
+                    document.getElementById('measSpinner').style.display = (data.step < 10) ? 'inline-block' : 'none';
+                    
+                    if (data.bg !== undefined) document.getElementById('measBg').textContent = data.bg;
+                    if (data.red_net !== undefined) document.getElementById('measRed').textContent = data.red_net;
+                    if (data.ir_net !== undefined) document.getElementById('measIr').textContent = data.ir_net;
+                    
+                    if (data.ir_net !== undefined && data.red_net !== undefined) {
+                        let A = 0.0;
+                        if (data.ir_net > 0) A = data.red_net / data.ir_net;
+                        
+                        if (data.step === 10) {
+                            let sto2 = 7.419 + (157.04 * A) - (131.49 * A * A) + (56.836 * A * A * A) - (9.5531 * A * A * A * A);
+                            if (sto2 > 100) sto2 = 100;
+                            if (sto2 < 0) sto2 = 0;
+                            
+                            document.getElementById('measRatio').textContent = A.toFixed(3);
+                            document.getElementById('measStO2').textContent = sto2.toFixed(2) + " %";
+                            
+                            if (measureSubMode === 'single') {
+                                saveRecordToDatabase(sto2.toFixed(2), A.toFixed(3));
+                                stopAnySubMode();
+                            } 
+                            else if (measureSubMode === 'ten') {
+                                tenMeasRatios.push(A);
+                                tenMeasStO2s.push(sto2);
+                                tenMeasCount++;
+                                
+                                document.getElementById('measRatio').textContent = A.toFixed(3) + " (Ölçüm " + tenMeasCount + ")";
+                                
+                                if (tenMeasCount < 10) {
+                                    setTimeout(() => {
+                                        if (measureSubMode === 'ten') sendCommand('O');
+                                    }, 250);
+                                } else {
+                                    let avgA = tenMeasRatios.reduce((a, b) => a + b, 0) / 10;
+                                    let avgStO2 = tenMeasStO2s.reduce((a, b) => a + b, 0) / 10;
+                                    
+                                    document.getElementById('measRatio').textContent = avgA.toFixed(3) + " (Ort.)";
+                                    document.getElementById('measStO2').textContent = avgStO2.toFixed(2) + " % (Ort.)";
+                                    
+                                    saveRecordToDatabase(avgStO2.toFixed(2), avgA.toFixed(3));
+                                    stopAnySubMode();
+                                }
+                            }
+                        } else {
+                            document.getElementById('measRatio').textContent = A.toFixed(3);
+                            
+                            if (measureSubMode === 'ten') {
+                                document.getElementById('measRatio').textContent = A.toFixed(3) + " (Ölçüm " + (tenMeasCount + 1) + ")";
+                            }
+                        }
+                    }
+                    
+                    let percent = Math.round((data.step / 10) * 100);
+                    document.getElementById('measProgressBar').style.width = percent + "%";
+                    document.getElementById('measProgressText').textContent = percent + "%";
+                }
+                else if (data.mode === 'continuous') {
+                    updateChart(data.red_net, data.ir_net);
+                }
+            } catch (e) {
+                console.error("JSON parse error:", e);
+            }
+        }
+
+        // === LOCAL DATABASE (LOCALSTORAGE ENGINE) ===
+        function saveRecordToDatabase(sto2, ratio) {
+            let history = JSON.parse(localStorage.getItem('meas_history')) || [];
+            let record = {
+                id: Date.now(),
+                date: new Date().toLocaleString(),
+                sto2: parseFloat(sto2),
+                ratio: parseFloat(ratio),
+                bpm: document.getElementById('statLatestBpm').textContent === '--' ? null : parseInt(document.getElementById('statLatestBpm').textContent)
+            };
+            
+            history.unshift(record); // Add to the top
+            localStorage.setItem('meas_history', JSON.stringify(history));
+            
+            // Auto update dashboard metrics
+            updateDashboardSummary(record.sto2);
+        }
+
+        function renderHistory() {
+            const hList = document.getElementById('historyList');
+            hList.innerHTML = '';
+            
+            let history = JSON.parse(localStorage.getItem('meas_history')) || [];
+            
+            if (history.length === 0) {
+                hList.innerHTML = '<div style="text-align:center; padding:20px; color:#8888a0; font-size:12px;">Henüz kayıtlı ölçüm bulunmuyor.</div>';
+                return;
+            }
+            
+            history.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div>
+                        <div class="history-sto2">${item.sto2.toFixed(2)} %</div>
+                        <div class="history-date">${item.date} ${item.bpm ? `| BPM: ${item.bpm}` : ''}</div>
+                    </div>
+                    <div class="history-delete" onclick="deleteHistoryRecord(${item.id})"><i class="fas fa-trash-alt"></i></div>
+                `;
+                hList.appendChild(div);
+            });
+        }
+
+        window.deleteHistoryRecord = function(id) {
+            let history = JSON.parse(localStorage.getItem('meas_history')) || [];
+            history = history.filter(item => item.id !== id);
+            localStorage.setItem('meas_history', JSON.stringify(history));
+            renderHistory();
+            updateDashboardSummary();
+        };
+
+        clearHistoryBtn.addEventListener('click', () => {
+            if (confirm("Tüm ölçüm geçmişini silmek istediğinize emin misiniz?")) {
+                localStorage.removeItem('meas_history');
+                renderHistory();
+                updateDashboardSummary();
+            }
+        });
+
+        // Update dashboard metrics & Fit Ring visual (Google Fit Style)
+        let sto2HistoryChart = null;
+        function updateDashboardSummary(newVal = null) {
+            let history = JSON.parse(localStorage.getItem('meas_history')) || [];
+            let total = history.length;
+            document.getElementById('statTotalMeas').textContent = total;
+            
+            if (total > 0) {
+                let sum = history.reduce((acc, curr) => acc + curr.sto2, 0);
+                let avg = sum / total;
+                let min = Math.min(...history.map(h => h.sto2));
+                
+                document.getElementById('statAvgStO2').textContent = avg.toFixed(1) + " %";
+                document.getElementById('statMinStO2').textContent = min.toFixed(1) + " %";
+                
+                let latestVal = newVal || history[0].sto2;
+                document.getElementById('dashStO2').textContent = latestVal.toFixed(1) + " %";
+                
+                // Draw Google Fit circular ring progress
+                // Circumference is 440 (2 * pi * r -> 2 * 3.14 * 70)
+                let ring = document.getElementById('dashRingProgress');
+                let offset = 440 - (latestVal / 100) * 440;
+                ring.style.strokeDashoffset = offset;
+                
+                if (latestVal > 95) ring.style.stroke = '#4CAF50'; // Green (Excellent)
+                else if (latestVal > 90) ring.style.stroke = '#ffeb3b'; // Yellow (Caution)
+                else ring.style.stroke = '#f44336'; // Red (Danger)
+
+                // Warning Pulse Alert if StO2 is below 90%
+                if (latestVal < 90) {
+                    document.body.classList.add('warning-active');
+                } else {
+                    document.body.classList.remove('warning-active');
+                }
+
+                // Render StO2 Trend Line Chart (Last 10 records, chronological order)
+                document.getElementById('sto2ChartCard').style.display = 'block';
+                let chartData = history.slice(0, 10).reverse();
+                let labels = chartData.map(h => {
+                    let parts = h.date.split(' ');
+                    return parts[1] || h.date; // display time portion if exists
+                });
+                let values = chartData.map(h => h.sto2);
+
+                if (sto2HistoryChart) {
+                    sto2HistoryChart.data.labels = labels;
+                    sto2HistoryChart.data.datasets[0].data = values;
+                    sto2HistoryChart.update();
+                } else {
+                    const sCtx = document.getElementById('sto2HistoryChart').getContext('2d');
+                    sto2HistoryChart = new Chart(sCtx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'StO2 % Trend',
+                                borderColor: '#00f2fe',
+                                backgroundColor: 'rgba(0, 242, 254, 0.1)',
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                tension: 0.3,
+                                data: values
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    min: 50,
+                                    max: 100,
+                                    ticks: { color: '#8888a0' },
+                                    grid: { color: 'rgba(255,255,255,0.05)' }
+                                },
+                                x: {
+                                    ticks: { color: '#8888a0' },
+                                    grid: { display: false }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false }
+                            }
+                        }
+                    });
+                }
+            } else {
+                document.getElementById('statAvgStO2').textContent = "-- %";
+                document.getElementById('statMinStO2').textContent = "-- %";
+                document.getElementById('dashStO2').textContent = "-- %";
+                document.getElementById('dashRingProgress').style.strokeDashoffset = 440;
+                document.body.classList.remove('warning-active');
+                document.getElementById('sto2ChartCard').style.display = 'none';
+                if (sto2HistoryChart) {
+                    sto2HistoryChart.destroy();
+                    sto2HistoryChart = null;
+                }
+            }
+        }
+
+        // Initialize dashboard on load
+        window.addEventListener('load', () => {
+            updateDashboardSummary();
+            
+            // Register PWA Service Worker for offline capability
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log("PWA Service Worker Kaydedildi!"))
+                .catch(err => console.error("Service worker registration failed:", err));
+            }
+        });
+    </script>
+</body>
+</html>
