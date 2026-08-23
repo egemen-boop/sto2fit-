@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sto2-fit-v2';
+const CACHE_NAME = 'sto2-fit-v3';
 const ASSETS = [
   './index.html',
   './manifest.json'
