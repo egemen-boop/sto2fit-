@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.egemen_boop.twa",
+        "sha256_cert_fingerprints": ["91:CF:45:EA:2A:FD:0F:BE:09:10:96:49:F1:33:92:54:94:01:8A:D5:D2:F8:E9:DE:4A:1A:8D:B8:EE:C6:D7:7E"]
+      }
+    }]
